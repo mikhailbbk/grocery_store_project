@@ -1,8 +1,7 @@
 from django.urls import path
+from . import views
 
 urlpatterns = [
-    # А знаешь, здесь все еще будет, 
-    # Южный ветер еще подует 
-    # И urls еще наколдует, 
-    # И память перелистает...
+    path('categories/', views.CategoryListView.as_view(), name='category-list'),
+    path('products/', views.ProductListView.as_view(), name='product-list'),
 ]
