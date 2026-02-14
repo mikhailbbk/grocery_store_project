@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils.text import slugify
 from django.core.validators import MinLengthValidator, MinValueValidator
+from django.conf import settings
 from PIL import Image
 import os
 
@@ -178,3 +179,64 @@ class Product(models.Model):
     def category(self):
         """Возвращает категорию товара через подкатегорию"""
         return self.subcategory.category
+
+class Cart(models.Model):
+    """Модель корзины пользователя"""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cart',
+        verbose_name='Пользователь'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+    
+    class Meta:
+        verbose_name = 'Корзина'
+        verbose_name_plural = 'Корзины'
+    
+    def __str__(self):
+        return f"Корзина {self.user.username}"
+    
+    @property
+    def total_price(self):
+        """Общая стоимость всех товаров в корзине"""
+        return sum(item.total_price for item in self.items.all())
+    
+    @property
+    def total_items(self):
+        """Общее количество товаров в корзине"""
+        return sum(item.quantity for item in self.items.all())
+
+class CartItem(models.Model):
+    """Модель товара в корзине"""
+    cart = models.ForeignKey(
+        Cart,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name='Корзина'
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        verbose_name='Товар'
+    )
+    quantity = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Количество'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата добавления')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
+    
+    class Meta:
+        verbose_name = 'Товар в корзине'
+        verbose_name_plural = 'Товары в корзине'
+        unique_together = ['cart', 'product']
+    
+    def __str__(self):
+        return f"{self.product.name} x{self.quantity}"
+    
+    @property
+    def total_price(self):
+        """Стоимость товара в корзине"""
+        return self.product.price * self.quantity
