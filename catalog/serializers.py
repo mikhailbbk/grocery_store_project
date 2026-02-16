@@ -19,6 +19,7 @@ class ProductSerializer(serializers.ModelSerializer):
     """Сериализатор для продуктов"""
     category = serializers.CharField(source='subcategory.category.name', read_only=True)
     subcategory = serializers.CharField(source='subcategory.name', read_only=True)
+    images = serializers.SerializerMethodField()
     
     class Meta:
         model = Product
@@ -29,23 +30,32 @@ class ProductSerializer(serializers.ModelSerializer):
             'category', 
             'subcategory', 
             'price', 
-            'image_original'
+            'images'
         ]
+    
+    def get_images(self, obj):
+        """Возвращает словарь со всеми изображениями товара"""
+        return obj.images_list
 
 class CartItemSerializer(serializers.ModelSerializer):
     """Сериализатор для товара в корзине"""
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_price = serializers.DecimalField(source='product.price', read_only=True, max_digits=10, decimal_places=2)
     total_price = serializers.SerializerMethodField()
+    product_images = serializers.SerializerMethodField()
     
     class Meta:
         model = CartItem
-        fields = ['id', 'product', 'product_name', 'product_price', 'quantity', 'total_price', 'created_at']
+        fields = ['id', 'product', 'product_name', 'product_price', 'product_images', 'quantity', 'total_price', 'created_at']
         read_only_fields = ['id', 'created_at']
     
     def get_total_price(self, obj):
         """Общая стоимость товара в корзине"""
         return obj.product.price * obj.quantity
+    
+    def get_product_images(self, obj):
+        """Изображения товара"""
+        return obj.product.images_list
 
 class CartSerializer(serializers.ModelSerializer):
     """Сериализатор для корзины"""
@@ -82,4 +92,4 @@ class AddToCartSerializer(serializers.Serializer):
 
 class UpdateCartItemSerializer(serializers.Serializer):
     """Сериализатор для изменения количества товара"""
-    quantity = serializers.IntegerField(min_value=0)  
+    quantity = serializers.IntegerField(min_value=0)

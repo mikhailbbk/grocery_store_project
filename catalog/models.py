@@ -16,7 +16,7 @@ def subcategory_image_path(instance, filename):
 def product_image_path(instance, filename):
     """Генерирует путь для сохранения изображений продукта"""
     # Получаем расширение файла
-    ext = filename.split('.')[-1]
+    ext = filename.split('.')[-1].lower()
     # Создаем имя файла с размером
     filename = f"{instance.slug}_original.{ext}"
     return f'products/{instance.slug}/{filename}'
@@ -55,6 +55,7 @@ class Category(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+
 
 class SubCategory(models.Model):
     """Модель подкатегории товаров"""
@@ -103,6 +104,7 @@ class SubCategory(models.Model):
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
+
 
 class Product(models.Model):
     """Модель товара"""
@@ -171,14 +173,79 @@ class Product(models.Model):
         return self.name
     
     def save(self, *args, **kwargs):
+        """Переопределенный save для создания трех размеров изображения"""
         if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
+            self.slug = slugify(self.name)        
+        
+        super().save(*args, **kwargs)        
+        
+        if self.image_original and not self.image_small:
+            self.create_image_sizes()            
+            super().save(*args, **kwargs)
+    
+    def create_image_sizes(self):
+        """Создает три размера изображения из оригинального"""
+        if not self.image_original:
+            return
+        
+        try:            
+            img = Image.open(self.image_original.path)            
+            
+            base_path = self.image_original.path
+            base_name = os.path.basename(base_path)
+            base_dir = os.path.dirname(base_path)
+            name_without_ext = os.path.splitext(base_name)[0].replace('_original', '')
+            ext = os.path.splitext(base_name)[1]
+                        
+            os.makedirs(base_dir, exist_ok=True)
+            
+            # Размеры для ресайза
+            sizes = {
+                'large': (800, 800),
+                'medium': (400, 400),
+                'small': (200, 200)
+            }            
+            
+            for size_name, (width, height) in sizes.items():                
+                img_copy = img.copy()                
+                
+                img_copy.thumbnail((width, height), Image.Resampling.LANCZOS)                
+                
+                new_filename = f"{name_without_ext}_{size_name}{ext}"
+                new_path = os.path.join(base_dir, new_filename)                
+                
+                img_copy.save(new_path)                
+                
+                relative_path = os.path.relpath(new_path, settings.MEDIA_ROOT).replace('\\', '/')
+                if size_name == 'large':
+                    self.image_large.name = relative_path
+                elif size_name == 'medium':
+                    self.image_medium.name = relative_path
+                elif size_name == 'small':
+                    self.image_small.name = relative_path
+                    
+        except Exception as e:
+            print(f"Ошибка при создании изображений: {e}")
     
     @property
     def category(self):
         """Возвращает категорию товара через подкатегорию"""
         return self.subcategory.category
+    
+    @property
+    def images_list(self):
+        """Возвращает словарь со всеми изображениями товара"""
+        images = {}
+        if self.image_small:
+            images['small'] = self.image_small.url
+        if self.image_medium:
+            images['medium'] = self.image_medium.url
+        if self.image_large:
+            images['large'] = self.image_large.url
+        if self.image_original:
+            images['original'] = self.image_original.url
+        return images
+
 
 class Cart(models.Model):
     """Модель корзины пользователя"""
@@ -207,6 +274,7 @@ class Cart(models.Model):
     def total_items(self):
         """Общее количество товаров в корзине"""
         return sum(item.quantity for item in self.items.all())
+
 
 class CartItem(models.Model):
     """Модель товара в корзине"""

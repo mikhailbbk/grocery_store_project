@@ -14,3 +14,7 @@ static/
 *.swp
 *.swo
 *~
+
+# Временные скрипты
+update_product_images.py
+create_fixtures.py
